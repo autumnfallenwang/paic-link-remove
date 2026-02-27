@@ -1,0 +1,293 @@
+{
+	"info": {
+		"name": "PAIC Recon & Link Operations",
+		"description": "REST API collection for investigating and resolving FOUND_ALREADY_LINKED issues in PAIC IDM reconciliation.\n\nRequires environment variables: idmUrl, amUrl, serviceAccountAccessToken.\nOptional: reconId, mappingName, linkId, linkRev, sourceObjectId, targetObjectId.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{serviceAccountAccessToken}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "1. Recon Operations",
+			"item": [
+				{
+					"name": "List All Recon Runs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept-API-Version",
+								"value": "resource=1.0"
+							}
+						],
+						"url": {
+							"raw": "{{idmUrl}}/recon",
+							"host": ["{{idmUrl}}"],
+							"path": ["recon"]
+						},
+						"description": "List all reconciliation runs.\n\nReturns: reconId, mapping, state, situationSummary, timestamps.\n\nFind your mapping name and note the reconId for the next calls."
+					}
+				},
+				{
+					"name": "Get Recon Summary",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept-API-Version",
+								"value": "resource=1.0"
+							}
+						],
+						"url": {
+							"raw": "{{idmUrl}}/recon/{{reconId}}",
+							"host": ["{{idmUrl}}"],
+							"path": ["recon", "{{reconId}}"]
+						},
+						"description": "Get full detail for a single recon run.\n\nConfirm situationSummary.FOUND_ALREADY_LINKED > 0 before proceeding."
+					}
+				},
+				{
+					"name": "Trigger Recon (with persistAssociations)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept-API-Version",
+								"value": "resource=1.0"
+							}
+						],
+						"url": {
+							"raw": "{{idmUrl}}/recon?_action=recon&mapping={{mappingName}}&persistAssociations=true&waitForCompletion=true",
+							"host": ["{{idmUrl}}"],
+							"path": ["recon"],
+							"query": [
+								{"key": "_action", "value": "recon"},
+								{"key": "mapping", "value": "{{mappingName}}"},
+								{"key": "persistAssociations", "value": "true"},
+								{"key": "waitForCompletion", "value": "true"}
+							]
+						},
+						"description": "Trigger a recon and store per-entry association data.\n\npersistAssociations=true is a runtime parameter, NOT a mapping config change.\nwaitForCompletion=true makes the call synchronous.\n\nReturns: reconId and state."
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Recon Association Data",
+			"item": [
+				{
+					"name": "List All Association Sets",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept-API-Version",
+								"value": "resource=1.0"
+							}
+						],
+						"url": {
+							"raw": "{{idmUrl}}/recon/assoc?_queryFilter=true",
+							"host": ["{{idmUrl}}"],
+							"path": ["recon", "assoc"],
+							"query": [
+								{"key": "_queryFilter", "value": "true"}
+							]
+						},
+						"description": "List all stored recon association sets.\n\nUse this to verify association data exists for your reconId.\nIf the recon was NOT run with persistAssociations=true, the entry won't exist."
+					}
+				},
+				{
+					"name": "Get All Entries for Recon",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept-API-Version",
+								"value": "resource=1.0"
+							}
+						],
+						"url": {
+							"raw": "{{idmUrl}}/recon/assoc/{{reconId}}/entry?_queryFilter=true&_pageSize=100",
+							"host": ["{{idmUrl}}"],
+							"path": ["recon", "assoc", "{{reconId}}", "entry"],
+							"query": [
+								{"key": "_queryFilter", "value": "true"},
+								{"key": "_pageSize", "value": "100"}
+							]
+						},
+						"description": "Get all per-entry recon details.\n\nReturns: sourceObjectId, targetObjectId, situation, action, status, linkQualifier.\n\nSupports pagination via _pageSize and _pagedResultsCookie."
+					}
+				},
+				{
+					"name": "Get FOUND_ALREADY_LINKED Entries",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept-API-Version",
+								"value": "resource=1.0"
+							}
+						],
+						"url": {
+							"raw": "{{idmUrl}}/recon/assoc/{{reconId}}/entry?_queryFilter=situation eq \"FOUND_ALREADY_LINKED\"&_pageSize=500",
+							"host": ["{{idmUrl}}"],
+							"path": ["recon", "assoc", "{{reconId}}", "entry"],
+							"query": [
+								{"key": "_queryFilter", "value": "situation eq \"FOUND_ALREADY_LINKED\""},
+								{"key": "_pageSize", "value": "500"}
+							]
+						},
+						"description": "Get only FOUND_ALREADY_LINKED entries from a recon run.\n\nFrom each entry, note sourceObjectId and targetObjectId to search for links."
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Link Operations",
+			"item": [
+				{
+					"name": "Search Link by firstId",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept-API-Version",
+								"value": "resource=1.0"
+							}
+						],
+						"url": {
+							"raw": "{{idmUrl}}/repo/link?_queryFilter=firstId eq \"{{sourceObjectId}}\"",
+							"host": ["{{idmUrl}}"],
+							"path": ["repo", "link"],
+							"query": [
+								{"key": "_queryFilter", "value": "firstId eq \"{{sourceObjectId}}\""}
+							]
+						},
+						"description": "Search link objects by firstId.\n\nTry with both sourceObjectId and targetObjectId since IDs may be flipped."
+					}
+				},
+				{
+					"name": "Search Link by secondId",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept-API-Version",
+								"value": "resource=1.0"
+							}
+						],
+						"url": {
+							"raw": "{{idmUrl}}/repo/link?_queryFilter=secondId eq \"{{targetObjectId}}\"",
+							"host": ["{{idmUrl}}"],
+							"path": ["repo", "link"],
+							"query": [
+								{"key": "_queryFilter", "value": "secondId eq \"{{targetObjectId}}\""}
+							]
+						},
+						"description": "Search link objects by secondId.\n\nTry with both sourceObjectId and targetObjectId since IDs may be flipped."
+					}
+				},
+				{
+					"name": "Search Link by linkType",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept-API-Version",
+								"value": "resource=1.0"
+							}
+						],
+						"url": {
+							"raw": "{{idmUrl}}/repo/link?_queryFilter=linkType eq \"{{mappingName}}\"",
+							"host": ["{{idmUrl}}"],
+							"path": ["repo", "link"],
+							"query": [
+								{"key": "_queryFilter", "value": "linkType eq \"{{mappingName}}\""}
+							]
+						},
+						"description": "Search all link objects for a specific mapping.\n\nUseful to see all links created by a mapping."
+					}
+				},
+				{
+					"name": "Delete Link",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept-API-Version",
+								"value": "resource=1.0"
+							},
+							{
+								"key": "If-Match",
+								"value": "{{linkRev}}"
+							}
+						],
+						"url": {
+							"raw": "{{idmUrl}}/repo/link/{{linkId}}",
+							"host": ["{{idmUrl}}"],
+							"path": ["repo", "link", "{{linkId}}"]
+						},
+						"description": "Delete a link object.\n\nIMPORTANT: _rev goes in the If-Match header, NOT as a query parameter.\nSet linkId and linkRev from the search results before calling."
+					}
+				}
+			]
+		},
+		{
+			"name": "4. Audit Recon (Alternative)",
+			"item": [
+				{
+					"name": "Query Audit by reconId",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept-API-Version",
+								"value": "resource=1.0"
+							}
+						],
+						"url": {
+							"raw": "{{idmUrl}}/audit/recon?_queryFilter=/reconId eq \"{{reconId}}\" and entryType eq \"entry\"",
+							"host": ["{{idmUrl}}"],
+							"path": ["audit", "recon"],
+							"query": [
+								{"key": "_queryFilter", "value": "/reconId eq \"{{reconId}}\" and entryType eq \"entry\""}
+							]
+						},
+						"description": "Alternative to association data. Query audit logs for per-entry recon details.\n\nRequires the recon audit topic to be enabled on the tenant.\nDoes NOT require persistAssociations=true."
+					}
+				},
+				{
+					"name": "Query Audit by Mapping",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept-API-Version",
+								"value": "resource=1.0"
+							}
+						],
+						"url": {
+							"raw": "{{idmUrl}}/audit/recon?_queryFilter=/mapping eq \"{{mappingName}}\"&_pageSize=100&_sortKeys=-timestamp",
+							"host": ["{{idmUrl}}"],
+							"path": ["audit", "recon"],
+							"query": [
+								{"key": "_queryFilter", "value": "/mapping eq \"{{mappingName}}\""},
+								{"key": "_pageSize", "value": "100"},
+								{"key": "_sortKeys", "value": "-timestamp"}
+							]
+						},
+						"description": "Query all audit entries across all recon runs for a given mapping.\n\nSorted by timestamp descending (latest first)."
+					}
+				}
+			]
+		}
+	]
+}
